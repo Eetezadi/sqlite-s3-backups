@@ -68,6 +68,9 @@ func (c *Config) Validate() error {
 	if c.DatabasePath == "" {
 		return fmt.Errorf("DATABASE_PATH is required")
 	}
+	if err := ValidateDatabaseURL(c.DatabasePath); err != nil {
+		return fmt.Errorf("DATABASE_PATH validation failed: %w", err)
+	}
 	if c.AWSAccessKeyID == "" {
 		return fmt.Errorf("AWS_ACCESS_KEY_ID is required")
 	}

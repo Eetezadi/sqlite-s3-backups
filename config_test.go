@@ -13,36 +13,6 @@ func TestConfigValidation(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name: "valid local database path",
-			config: Config{
-				DatabasePath:       "/data/test.db",
-				AWSAccessKeyID:     "test-key",
-				AWSSecretAccessKey: "test-secret",
-				S3Bucket:           "test-bucket",
-			},
-			shouldError: false,
-		},
-		{
-			name: "valid HTTP URL",
-			config: Config{
-				DatabasePath:       "https://example.com/database.db",
-				AWSAccessKeyID:     "test-key",
-				AWSSecretAccessKey: "test-secret",
-				S3Bucket:           "test-bucket",
-			},
-			shouldError: false,
-		},
-		{
-			name: "valid S3 URL",
-			config: Config{
-				DatabasePath:       "s3://source-bucket/database.db",
-				AWSAccessKeyID:     "test-key",
-				AWSSecretAccessKey: "test-secret",
-				S3Bucket:           "test-bucket",
-			},
-			shouldError: false,
-		},
-		{
 			name: "valid libSQL URL",
 			config: Config{
 				DatabasePath:       "libsql://mydb.turso.io",
@@ -52,6 +22,39 @@ func TestConfigValidation(t *testing.T) {
 				S3Bucket:           "test-bucket",
 			},
 			shouldError: false,
+		},
+		{
+			name: "valid Turso HTTPS URL",
+			config: Config{
+				DatabasePath:       "https://mydb.turso.io",
+				DatabaseAuthToken:  "test-token",
+				AWSAccessKeyID:     "test-key",
+				AWSSecretAccessKey: "test-secret",
+				S3Bucket:           "test-bucket",
+			},
+			shouldError: false,
+		},
+		{
+			name: "invalid local path",
+			config: Config{
+				DatabasePath:       "/data/test.db",
+				AWSAccessKeyID:     "test-key",
+				AWSSecretAccessKey: "test-secret",
+				S3Bucket:           "test-bucket",
+			},
+			shouldError: true,
+			errorMsg:    "DATABASE_PATH validation failed: invalid database URL: must be a libSQL URL (libsql:// or https://*.turso.io)",
+		},
+		{
+			name: "invalid HTTP URL",
+			config: Config{
+				DatabasePath:       "https://example.com/database.db",
+				AWSAccessKeyID:     "test-key",
+				AWSSecretAccessKey: "test-secret",
+				S3Bucket:           "test-bucket",
+			},
+			shouldError: true,
+			errorMsg:    "DATABASE_PATH validation failed: invalid database URL: must be a libSQL URL (libsql:// or https://*.turso.io)",
 		},
 		{
 			name: "missing database path",
@@ -66,7 +69,7 @@ func TestConfigValidation(t *testing.T) {
 		{
 			name: "missing AWS access key",
 			config: Config{
-				DatabasePath:       "/data/test.db",
+				DatabasePath:       "libsql://mydb.turso.io",
 				AWSSecretAccessKey: "test-secret",
 				S3Bucket:           "test-bucket",
 			},
@@ -76,7 +79,7 @@ func TestConfigValidation(t *testing.T) {
 		{
 			name: "missing AWS secret key",
 			config: Config{
-				DatabasePath:   "/data/test.db",
+				DatabasePath:   "libsql://mydb.turso.io",
 				AWSAccessKeyID: "test-key",
 				S3Bucket:       "test-bucket",
 			},
@@ -86,7 +89,7 @@ func TestConfigValidation(t *testing.T) {
 		{
 			name: "missing S3 bucket",
 			config: Config{
-				DatabasePath:       "/data/test.db",
+				DatabasePath:       "libsql://mydb.turso.io",
 				AWSAccessKeyID:     "test-key",
 				AWSSecretAccessKey: "test-secret",
 			},
@@ -118,7 +121,8 @@ func TestConfigDefaults(t *testing.T) {
 	os.Clearenv()
 
 	// Set only required variables
-	os.Setenv("DATABASE_PATH", "/data/test.db")
+	os.Setenv("DATABASE_PATH", "libsql://mydb.turso.io")
+	os.Setenv("DATABASE_AUTH_TOKEN", "test-token")
 	os.Setenv("AWS_ACCESS_KEY_ID", "test-key")
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
 	os.Setenv("AWS_S3_BUCKET", "test-bucket")
@@ -195,7 +199,8 @@ func TestConfigBooleanParsing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Clearenv()
-			os.Setenv("DATABASE_PATH", "/data/test.db")
+			os.Setenv("DATABASE_PATH", "libsql://mydb.turso.io")
+			os.Setenv("DATABASE_AUTH_TOKEN", "test-token")
 			os.Setenv("AWS_ACCESS_KEY_ID", "test-key")
 			os.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
 			os.Setenv("AWS_S3_BUCKET", "test-bucket")

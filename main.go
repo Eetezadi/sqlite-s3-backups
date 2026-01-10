@@ -20,7 +20,7 @@ func main() {
 
 	// Handle version flag
 	if *versionFlag {
-		fmt.Printf("sqlite-s3-backup version %s\n", version)
+		fmt.Printf("libsql-s3-backup version %s\n", version)
 		os.Exit(0)
 	}
 
@@ -40,7 +40,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Printf("SQLite S3 Backup Service v%s starting...", version)
+	log.Printf("libSQL S3 Backup Service v%s starting...", version)
 	log.Printf("Database: %s", cfg.DatabasePath)
 	log.Printf("S3 Bucket: %s/%s", cfg.S3Bucket, cfg.BucketSubfolder)
 	log.Printf("Schedule: %s", cfg.CronSchedule)
