@@ -1,14 +1,26 @@
-node_modules
-dist
-src
+# Documentation
 *.md
+README.md
+
+# Git files
 .git
 .gitignore
-*.ts
-tsconfig.json
-package.json
-package-lock.json
+
+# Development files
 .env
+.vscode
+.idea
+
+# Test files
+test_setup.go
+verify_backup.go
+test_http_server.go
+test.sh
+
+# Database files
 *.db
 *.db-wal
 *.db-shm
+
+# Compiled binaries
+sqlite-s3-backup

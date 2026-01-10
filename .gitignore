@@ -1,8 +1,4 @@
-# Node.js (legacy)
-dist
-node_modules
-
-# Go
+# Go binaries
 sqlite-s3-backup
 *.exe
 *.exe~
@@ -17,6 +13,7 @@ go.work
 test_setup.go
 verify_backup.go
 test.sh
+test_http_server.go
 
 # IDEs
 .idea
