@@ -1,5 +1,31 @@
+# Node.js (legacy)
 dist
 node_modules
 
-# Webstorm
+# Go
+sqlite-s3-backup
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Test files
+test_setup.go
+verify_backup.go
+test.sh
+
+# IDEs
 .idea
+.vscode
+
+# Environment
+.env
+
+# Database files
+*.db
+*.db-wal
+*.db-shm

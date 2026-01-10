@@ -1,0 +1,14 @@
+node_modules
+dist
+src
+*.md
+.git
+.gitignore
+*.ts
+tsconfig.json
+package.json
+package-lock.json
+.env
+*.db
+*.db-wal
+*.db-shm

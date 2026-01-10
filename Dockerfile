@@ -1,31 +1,39 @@
-ARG NODE_VERSION='20.11.1'
+ARG GO_VERSION='1.21'
 
-FROM node:${NODE_VERSION}-alpine AS build
+# Build stage
+FROM golang:${GO_VERSION}-alpine AS build
 
-ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-ENV NPM_CONFIG_FUND=false
-
-WORKDIR /app
-
-COPY package*.json tsconfig.json ./
-COPY src ./src
-
-RUN npm ci && \
-    npm run build && \
-    npm prune --production
-
-FROM node:${NODE_VERSION}-alpine
+# Install build dependencies (gcc required for go-sqlite3)
+RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /app
 
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/package.json ./
+# Copy go mod files
+COPY go.mod go.sum* ./
 
-ARG PG_VERSION='16'
+# Download dependencies
+RUN go mod download
 
-RUN apk add --update --no-cache postgresql${PG_VERSION}-client
+# Copy source code
+COPY main.go ./
 
-CMD pg_isready --dbname=$BACKUP_DATABASE_URL && \
-    pg_dump --version && \
-    node dist/index.js
+# Build the application
+# CGO_ENABLED=1 is required for go-sqlite3
+RUN CGO_ENABLED=1 GOOS=linux go build -a -ldflags '-linkmode external -extldflags "-static"' -o sqlite-s3-backup .
+
+# Runtime stage
+FROM alpine:latest
+
+# Install ca-certificates for HTTPS requests to S3
+RUN apk add --no-cache ca-certificates
+
+WORKDIR /app
+
+# Copy the binary from build stage
+COPY --from=build /app/sqlite-s3-backup .
+
+# Create a directory for SQLite databases (optional)
+RUN mkdir -p /data
+
+# Run the application
+CMD ["./sqlite-s3-backup"]
