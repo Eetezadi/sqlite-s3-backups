@@ -1,12 +1,13 @@
 # SQLite S3 Backups
 
-A simple Go application to backup your SQLite database to S3 via a cron schedule or on-demand.
+A simple Go application to backup your SQLite or libSQL database to S3 via a cron schedule or on-demand.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template/I4zGrH)
 
 ## Features
 
-- Automated SQLite backups using `VACUUM INTO` command
+- Automated SQLite/libSQL backups using `VACUUM INTO` command
+- **libSQL/Turso support** - Direct connection to libSQL databases via `libsql://` URLs
 - **URL-based database access** - Download databases from HTTP/HTTPS or S3 URLs (perfect for Railway!)
 - S3-compatible storage support (AWS S3, Cloudflare R2, Backblaze B2, MinIO, etc.)
 - Configurable cron scheduling
@@ -18,10 +19,11 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 
 ### Required Environment Variables
 
-- `DATABASE_PATH` - The path or URL to the SQLite database to backup. Supports:
+- `DATABASE_PATH` - The path or URL to the SQLite/libSQL database to backup. Supports:
   - Local file paths: `/data/myapp.db`
   - HTTP/HTTPS URLs: `https://example.com/database.db`
   - S3 URLs: `s3://bucket-name/path/to/database.db`
+  - libSQL URLs: `libsql://your-database.turso.io` or `https://your-database.turso.io`
 
 - `AWS_ACCESS_KEY_ID` - AWS access key ID.
 
@@ -39,6 +41,8 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 
 - `AWS_S3_FORCE_PATH_STYLE` - Use path style for the endpoint instead of the default subdomain style, useful for MinIO. Default: `false`
 
+- `DATABASE_AUTH_TOKEN` - Authentication token for libSQL/Turso databases. Required when using `libsql://` URLs. Get this from your Turso database dashboard.
+
 - `RUN_ON_STARTUP` - Run a backup on startup of this application then proceed with making backups on the set schedule. Default: `false`
 
 - `BACKUP_FILE_PREFIX` - Add a prefix to the backup file name. Default: `backup`
@@ -53,12 +57,13 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 
 ## How It Works
 
-1. If `DATABASE_PATH` is a URL, the application downloads the database to a temporary location
-2. The application connects to your SQLite database (local or downloaded)
-3. It creates a backup using SQLite's `VACUUM INTO` command, which creates a clean, optimized copy of the database
-4. The backup file is uploaded to your S3-compatible storage
-5. Temporary files (downloaded database and backup) are automatically cleaned up
-6. The process repeats according to your cron schedule, or exits if in single-shot mode
+1. **For libSQL/Turso databases**: Connects directly to the database server using the libSQL protocol
+2. **For HTTP/S3 URLs**: Downloads the database file to a temporary location
+3. **For local files**: Uses the file path directly
+4. Creates a backup using `VACUUM INTO` command, which creates a clean, optimized copy
+5. Uploads the backup file to your S3-compatible storage
+6. Cleans up temporary files
+7. Repeats according to your cron schedule, or exits if in single-shot mode
 
 ## SQLite VACUUM INTO
 
@@ -118,6 +123,55 @@ http.HandleFunc("/db/database.db", func(w http.ResponseWriter, r *http.Request) 
 ```
 
 Then set: `DATABASE_PATH=https://your-app-url.railway.app/db/database.db`
+
+## libSQL / Turso Database Support
+
+This application supports direct backup of libSQL and Turso databases without downloading the entire database first. This is perfect for cloud-native applications using Turso.
+
+### How It Works
+
+Instead of downloading the database file, the application:
+1. Connects directly to your libSQL/Turso database using the libSQL protocol
+2. Executes `VACUUM INTO` on the server to create an optimized backup
+3. Downloads only the resulting backup file
+4. Uploads the backup to S3
+
+This is more efficient than downloading the entire database, backing it up locally, and uploading again.
+
+### Configuration
+
+```bash
+# Turso database URL
+DATABASE_PATH=libsql://your-database.turso.io
+
+# Or use HTTPS URL (automatically detected as Turso)
+DATABASE_PATH=https://your-database.turso.io
+
+# Authentication token from Turso dashboard
+DATABASE_AUTH_TOKEN=your-turso-auth-token
+
+# S3 configuration
+AWS_ACCESS_KEY_ID=your-s3-key
+AWS_SECRET_ACCESS_KEY=your-s3-secret
+AWS_S3_BUCKET=my-backups
+```
+
+### Getting Your Turso Credentials
+
+1. Create a database at [turso.tech](https://turso.tech)
+2. Get your database URL: `turso db show <database-name>`
+3. Create an auth token: `turso db tokens create <database-name>`
+4. Use these in your environment variables
+
+### Example: Daily Turso Backups
+
+```bash
+DATABASE_PATH=libsql://my-app-production.turso.io
+DATABASE_AUTH_TOKEN=eyJhbGc...your-token
+AWS_S3_BUCKET=my-turso-backups
+BACKUP_CRON_SCHEDULE="0 2 * * *"  # Daily at 2 AM
+BUCKET_SUBFOLDER=production
+```
 
 ## Deployment
 
@@ -187,6 +241,17 @@ AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret
 AWS_S3_BUCKET=my-backups
 BUCKET_SUBFOLDER=backups  # Store backups in a subfolder
+```
+
+### Turso: Direct database backup
+
+```bash
+DATABASE_PATH=libsql://my-prod-db.turso.io
+DATABASE_AUTH_TOKEN=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9...
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_S3_BUCKET=turso-backups
+BACKUP_CRON_SCHEDULE="0 0 * * *"  # Daily at midnight
 ```
 
 ### Using with Cloudflare R2
