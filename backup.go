@@ -142,5 +142,17 @@ func validateBackupFile(backupPath string) error {
 		return fmt.Errorf("backup file is empty")
 	}
 
+	// Verify it's a valid SQLite database by attempting to open it
+	db, err := sql.Open("sqlite3", backupPath)
+	if err != nil {
+		return fmt.Errorf("backup file is not a valid SQLite database: %w", err)
+	}
+	defer db.Close()
+
+	// Try to ping the database to ensure it's actually readable
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("backup file is corrupted or invalid: %w", err)
+	}
+
 	return nil
 }
