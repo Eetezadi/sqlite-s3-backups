@@ -7,6 +7,7 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 ## Features
 
 - Automated SQLite backups using `VACUUM INTO` command
+- **URL-based database access** - Download databases from HTTP/HTTPS or S3 URLs (perfect for Railway!)
 - S3-compatible storage support (AWS S3, Cloudflare R2, Backblaze B2, MinIO, etc.)
 - Configurable cron scheduling
 - Single-shot mode for platform-native cron schedulers
@@ -17,7 +18,10 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 
 ### Required Environment Variables
 
-- `DATABASE_PATH` - The file path to the SQLite database to backup. Example: `/data/myapp.db`
+- `DATABASE_PATH` - The path or URL to the SQLite database to backup. Supports:
+  - Local file paths: `/data/myapp.db`
+  - HTTP/HTTPS URLs: `https://example.com/database.db`
+  - S3 URLs: `s3://bucket-name/path/to/database.db`
 
 - `AWS_ACCESS_KEY_ID` - AWS access key ID.
 
@@ -49,11 +53,12 @@ A simple Go application to backup your SQLite database to S3 via a cron schedule
 
 ## How It Works
 
-1. The application connects to your SQLite database specified in `DATABASE_PATH`
-2. It creates a backup using SQLite's `VACUUM INTO` command, which creates a clean, optimized copy of the database
-3. The backup file is uploaded to your S3-compatible storage
-4. The local backup file is automatically cleaned up after successful upload
-5. The process repeats according to your cron schedule, or exits if in single-shot mode
+1. If `DATABASE_PATH` is a URL, the application downloads the database to a temporary location
+2. The application connects to your SQLite database (local or downloaded)
+3. It creates a backup using SQLite's `VACUUM INTO` command, which creates a clean, optimized copy of the database
+4. The backup file is uploaded to your S3-compatible storage
+5. Temporary files (downloaded database and backup) are automatically cleaned up
+6. The process repeats according to your cron schedule, or exits if in single-shot mode
 
 ## SQLite VACUUM INTO
 
@@ -63,6 +68,56 @@ This application uses SQLite's `VACUUM INTO` command, which:
 - Produces a clean backup file
 - Does not require external tools like `sqlite3` CLI
 - Works with the database while it's in use (with proper locking)
+
+## URL-Based Database Access
+
+Perfect for cloud platforms like Railway where services can't share volumes! The application can download your database from a URL before backing it up.
+
+### Supported URL Schemes
+
+1. **HTTP/HTTPS** - Download from any web server
+   ```bash
+   DATABASE_PATH=https://myapp.example.com/database.db
+   ```
+   Use this when your application exposes the database file via HTTP (e.g., using a simple file server)
+
+2. **S3** - Download directly from S3 or S3-compatible storage
+   ```bash
+   DATABASE_PATH=s3://my-bucket/databases/production.db
+   ```
+   Use this when your application writes the database to S3
+
+3. **Local File** - Traditional file path (backwards compatible)
+   ```bash
+   DATABASE_PATH=/data/myapp.db
+   ```
+
+### Railway Deployment Pattern
+
+For Railway deployments with separate services:
+
+**Option 1: HTTP Endpoint**
+- Your app service runs a simple file server that serves the database file
+- This backup service downloads via HTTP URL
+- Example: `DATABASE_PATH=https://myapp.railway.app/db/database.db`
+
+**Option 2: Shared S3 Storage**
+- Your app service periodically uploads database to S3
+- This backup service downloads from S3, backs it up, and uploads to backup location
+- Example: `DATABASE_PATH=s3://my-app-bucket/live/database.db`
+
+### Example: Simple HTTP File Server in Your App
+
+Add this to your application to expose the database:
+
+```go
+// Serve database file at /db/database.db
+http.HandleFunc("/db/database.db", func(w http.ResponseWriter, r *http.Request) {
+    http.ServeFile(w, r, "/data/database.db")
+})
+```
+
+Then set: `DATABASE_PATH=https://your-app-url.railway.app/db/database.db`
 
 ## Deployment
 
@@ -112,6 +167,26 @@ RUN_ON_STARTUP=true
 ```bash
 SINGLE_SHOT_MODE=true
 RUN_ON_STARTUP=false  # Not needed, will be ignored
+```
+
+### Railway: Backup from HTTP URL
+
+```bash
+DATABASE_PATH=https://myapp.railway.app/db/database.db
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_S3_BUCKET=my-backups
+BACKUP_CRON_SCHEDULE="0 */12 * * *"  # Every 12 hours
+```
+
+### Railway: Backup from S3 source
+
+```bash
+DATABASE_PATH=s3://my-app-storage/live/database.db
+AWS_ACCESS_KEY_ID=your_key
+AWS_SECRET_ACCESS_KEY=your_secret
+AWS_S3_BUCKET=my-backups
+BUCKET_SUBFOLDER=backups  # Store backups in a subfolder
 ```
 
 ### Using with Cloudflare R2
