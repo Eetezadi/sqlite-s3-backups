@@ -15,7 +15,7 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 # Copy source code
-COPY main.go ./
+COPY *.go ./
 
 # Build the application
 # CGO_ENABLED=1 is required for go-sqlite3

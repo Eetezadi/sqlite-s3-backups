@@ -123,9 +123,27 @@ func TestConfigDefaults(t *testing.T) {
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
 	os.Setenv("AWS_S3_BUCKET", "test-bucket")
 
-	cfg, err := LoadConfig()
+	// Create config directly without LoadConfig to avoid .env file interference
+	cfg := &Config{
+		DatabasePath:       os.Getenv("DATABASE_PATH"),
+		DatabaseAuthToken:  getEnv("DATABASE_AUTH_TOKEN", ""),
+		AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
+		AWSRegion:          getEnv("AWS_S3_REGION", "us-east-1"),
+		S3Bucket:           os.Getenv("AWS_S3_BUCKET"),
+		S3Endpoint:         getEnv("AWS_S3_ENDPOINT", ""),
+		S3ForcePathStyle:   getBoolEnv("AWS_S3_FORCE_PATH_STYLE", false),
+		BucketSubfolder:    getEnv("BUCKET_SUBFOLDER", ""),
+		BackupFilePrefix:   getEnv("BACKUP_FILE_PREFIX", "backup"),
+		SupportObjectLock:  getBoolEnv("SUPPORT_OBJECT_LOCK", false),
+		CronSchedule:       getEnv("BACKUP_CRON_SCHEDULE", "0 5 * * *"),
+		RunOnStartup:       getBoolEnv("RUN_ON_STARTUP", false),
+		SingleShotMode:     getBoolEnv("SINGLE_SHOT_MODE", false),
+	}
+
+	err := cfg.Validate()
 	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
+		t.Fatalf("Failed to validate config: %v", err)
 	}
 
 	// Test defaults
