@@ -1,8 +1,39 @@
 # SQLite S3 Backups
 
-A simple Go application to backup your SQLite or libSQL database to S3 via a cron schedule or on-demand.
+A simple, efficient Go application to backup your SQLite or libSQL database to S3 via cron schedule or on-demand.
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template/I4zGrH)
+
+## Quick Start
+
+```bash
+# Set required environment variables
+export DATABASE_PATH=/data/myapp.db
+export AWS_ACCESS_KEY_ID=your_key_id
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_S3_BUCKET=my-backups
+
+# Run a single backup
+./sqlite-s3-backup --validate  # Check configuration
+./sqlite-s3-backup             # Run backup service
+```
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+  - [Required Variables](#required-environment-variables)
+  - [Optional Variables](#optional-environment-variables)
+- [How It Works](#how-it-works)
+- [Database Sources](#database-sources)
+  - [SQLite VACUUM INTO](#sqlite-vacuum-into)
+  - [URL-Based Access](#url-based-database-access)
+  - [libSQL / Turso Support](#libsql--turso-database-support)
+- [Deployment](#deployment)
+- [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
+- [Development](#development)
 
 ## Features
 
@@ -14,6 +45,46 @@ A simple Go application to backup your SQLite or libSQL database to S3 via a cro
 - Single-shot mode for platform-native cron schedulers
 - Optional object lock support
 - Lightweight Go binary with minimal dependencies
+
+## Installation
+
+### Download Pre-built Binary
+
+```bash
+# Download latest release (replace with actual release URL)
+wget https://github.com/yourrepo/sqlite-s3-backups/releases/latest/download/sqlite-s3-backup
+chmod +x sqlite-s3-backup
+./sqlite-s3-backup --version
+```
+
+### Build from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/yourrepo/sqlite-s3-backups.git
+cd sqlite-s3-backups
+
+# Build (requires Go 1.21+ and CGO)
+CGO_ENABLED=1 go build -o sqlite-s3-backup .
+
+# Verify
+./sqlite-s3-backup --version
+```
+
+### Docker
+
+```bash
+# Build
+docker build -t sqlite-s3-backup .
+
+# Run
+docker run -e DATABASE_PATH=/data/mydb.db \
+  -e AWS_ACCESS_KEY_ID=your_key \
+  -e AWS_SECRET_ACCESS_KEY=your_secret \
+  -e AWS_S3_BUCKET=your_bucket \
+  -v /path/to/your/database:/data \
+  sqlite-s3-backup
+```
 
 ## Configuration
 
@@ -270,11 +341,97 @@ AWS_S3_FORCE_PATH_STYLE=true
 AWS_S3_REGION=us-east-1
 ```
 
+## Troubleshooting
+
+### CGO Build Errors
+
+**Problem**: `build constraints exclude all Go files` or `undefined: sqlite3`
+
+**Solution**: Ensure CGO is enabled:
+```bash
+CGO_ENABLED=1 go build -o sqlite-s3-backup .
+```
+
+On Alpine Linux, install build dependencies:
+```bash
+apk add --no-cache gcc musl-dev sqlite-dev
+```
+
+### libSQL Connection Errors
+
+**Problem**: `failed to connect to libSQL database`
+
+**Solutions**:
+- Verify your `DATABASE_AUTH_TOKEN` is correct (get it from Turso dashboard)
+- Check that the database URL is correct (should be `libsql://your-db.turso.io` or `https://your-db.turso.io`)
+- Ensure your auth token hasn't expired
+
+### S3 Upload Fails
+
+**Problem**: `S3 upload failed` or permission errors
+
+**Solutions**:
+- Verify `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are correct
+- Check bucket permissions (must allow PutObject)
+- For Cloudflare R2, ensure `AWS_S3_REGION=auto`
+- For MinIO, set `AWS_S3_FORCE_PATH_STYLE=true`
+- Check the `AWS_S3_ENDPOINT` format (should include protocol: `https://`)
+
+### Database Download Errors
+
+**Problem**: `failed to download database` from URL
+
+**Solutions**:
+- **HTTP/HTTPS**: Verify the URL is accessible and returns the database file
+- **S3 URLs**: Ensure your AWS credentials have GetObject permission for the source bucket
+- Check network connectivity to the source
+- Verify the URL scheme is correct (`http://`, `https://`, or `s3://`)
+
+### VACUUM INTO Errors
+
+**Problem**: `VACUUM INTO failed` or `database is locked`
+
+**Solutions**:
+- Ensure the source database is not exclusively locked by another process
+- Check available disk space (VACUUM creates a full copy)
+- For libSQL databases, verify the database supports VACUUM INTO (most recent versions do)
+- Check SQLite version is 3.27.0+ (when VACUUM INTO was added)
+
+### Object Lock Issues
+
+**Problem**: `MD5 hash required` or object lock errors
+
+**Solution**: Enable object lock support:
+```bash
+SUPPORT_OBJECT_LOCK=true
+```
+
+Note: This computes MD5 hash of the backup file, which uses more memory.
+
+### Cron Schedule Not Working
+
+**Problem**: Backups don't run on schedule
+
+**Solutions**:
+- Verify cron syntax is correct (5 fields: minute hour day month weekday)
+- Check logs for schedule parsing errors
+- Test with a frequent schedule first: `BACKUP_CRON_SCHEDULE="*/5 * * * *"` (every 5 minutes)
+- Ensure the application is running continuously (not in `SINGLE_SHOT_MODE`)
+
+### Configuration Validation
+
+To test your configuration without running a backup:
+```bash
+./sqlite-s3-backup --validate
+```
+
+This will verify all required environment variables are set and the cron schedule is valid.
+
 ## Building from Source
 
 ```bash
 go mod download
-CGO_ENABLED=1 go build -o sqlite-s3-backup main.go
+CGO_ENABLED=1 go build -o sqlite-s3-backup .
 ```
 
 Note: CGO must be enabled for SQLite support.
